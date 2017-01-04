@@ -1,6 +1,4 @@
 #This is the list of files that will be deployed if 
 #tentacles is enabled
 #One per line please
-/etc/cryptolocked
-/root/doc.cl
-/root/cryptolocked.doc
+test.file

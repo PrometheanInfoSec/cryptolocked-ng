@@ -31,9 +31,12 @@ class hunter:
 
 	cl = None
 
+	osname = None
+	
 	def __init__(self, cl=None):
 		self.cl = cl
 
+		
 		try:
                         self.cl.check_loaded()
                 except:
@@ -43,20 +46,34 @@ class hunter:
                         sys.exit(-1)
 
 
-		if os.name != 'posix' or subprocess.call('which lsof 1>/dev/null 2>/dev/null', shell=True) != 0:
+		if os.name == 'posix' and subprocess.call('which lsof 1>/dev/null 2>/dev/null', shell=True) != 0:
 			print "Something went wrong locating the lsof binary"
-			print "Is this a linux machine?"
 			print "The hunter module cannot continue"
 			print "Disable hunter in the config file"
 			print "Exiting.."
 			sys.exit(-1)
 		
+		if os.name == 'nt':
+			self.osname = 'nt'
+		
+		if os.name == "posix":
+			self.osname = "posix"
+		
+		if self.osname is None:
+			print "Unsupported OS detected"
+			print "Exiting.."
+			sys.exit(-1)
+		
+		
+		
 		if not os.path.exists(self.cl.conf['hunterphile']):
-			print "Something went wrong locating the hunterphile: %s" % (hunterphile)
+			print "Something went wrong locating the hunterphile: %s" % (self.cl.conf['hunterphile'])
 			print "Hunter cannot continue"
 			print "Exiting.."
 			sys.exit(-1)
-	
+
+		
+		
 		fi = open(self.cl.conf['hunterphile'], "r")
 		data = fi.read()
 		fi.close()
@@ -69,24 +86,56 @@ class hunter:
 				continue
 			self.hunterfiles.append(line)
 			print "Hunter tracking file: %s" % line
-
-
-	def loop(self):
-                while True:
-                        time.sleep(self.cl.conf['hunter_pause'])
-                        output = subprocess.check_output("lsof 2>/dev/null", shell=True)
-                        for line in output.split("\n"):
-                                if len(line) == 0:
-                                        continue
-                                for fii in self.hunterfiles:
-                                        if fii == line.split()[-1]:
-                                                if self.cl.conf['armed_state'] or self.cl.conf['only_arm_hunter']:
-                                                        subprocess.call("kill -9 %s" % line.split()[1], shell=True)
-                                                        print "Process PID [%s] has been killed for attempting to access the hunter tracked file [%s]" % (line.split()[1], fii)
-                                                else:
-                                                        print "Process PID [%s] accessed file [%s] but cryptolocked.hunter is not armed so no actions were taken" % (line.split()[1], fii)
-
 	
+	def loop(self):
+		if self.osname == "nt":
+			self.win_loop()
+		elif self.osname == "posix":
+			self.lin_loop()
+	
+	def win_loop(self):
+		while True:
+		
+			pidline = None
+			
+			time.sleep(self.cl.conf['hunter_pause'])
+			output = subprocess.check_output("assets\handle.exe", shell=True)
+			for line in output.split("\n"):
+				if "pid:" in line:
+					pidline = line
+					continue
+					
+				if len(line) == 0:
+					continue
+				
+				
+				for fii in self.hunterfiles:
+					
+					if fii in line:
+						print fii
+						pid = pidline.split()[2]
+						if self.cl.conf['armed_state'] or self.cl.conf['only_arm_hunter']:
+							subprocess.call("taskkill /pid %s" % str(pid), shell=True)
+							print "Process PID [%s] has been killed for attempting to access the hunter tracked file [%s]" % (pid, fii)
+						else:
+							print "Process PID [%s] accessed file [%s] but cryptolocked.hunter is not armed so no actions were taken" % (pid, fii)
+	
+	def lin_loop(self):
+		while True:
+			time.sleep(self.cl.conf['hunter_pause'])
+			output = subprocess.check_output("lsof 2>/dev/null", shell=True)
+			for line in output.split("\n"):
+				if len(line) == 0:
+					continue
+				for fii in self.hunterfiles:
+					if fii == line.split()[-1]:
+						if self.cl.conf['armed_state'] or self.cl.conf['only_arm_hunter']:
+							subprocess.call("kill -9 %s" % line.split()[1], shell=True)
+							print "Process PID [%s] has been killed for attempting to access the hunter tracked file [%s]" % (line.split()[1], fii)
+						else:
+							print "Process PID [%s] accessed file [%s] but cryptolocked.hunter is not armed so no actions were taken" % (line.split()[1], fii)
+
+
 class tentacles:
 	filename = []
 	content = []
@@ -246,7 +295,9 @@ class cryptolocked:
 
 		self.conf[one][0] = two
 		
-
+	def read_conf(self):
+		for key in self.conf.keys():
+			print "%s: %s" % (key, self.conf[key])
 
 	def conf_types(self):
 	
@@ -273,6 +324,7 @@ class cryptolocked:
 
 		self.parse_conf()
 
+		
 
 		if self.conf['tentacles']:
 			self.t = tentacles(self)
@@ -298,7 +350,10 @@ class cryptolocked:
 
 		count = 0
 		banner_printed = False
-		for line in data.split("\n"):
+		splitby = "\n"
+		#if os.name != "posix":
+		#	splitby = "\r\n"
+		for line in data.split(splitby):
 			count += 1
 			if len(line) == 0 or line[0] == "#":
 				continue
@@ -362,6 +417,7 @@ class cryptolocked:
 			print "Exiting.."
 			sys.exit(-1)
 
+		self.read_conf()
 		self.conf_types()
 
 
@@ -453,12 +509,12 @@ class cryptolocked:
 		#Simulated Action
                 if not self.conf['armed_state'] or self.conf['only_arm_hunter']:
                         print "Trigger Simulated Failsafe"
-                        sys.exit(0)
+                        allexit()
 
 		if not self.conf['no_failsafe']:
 			failsafe()
 
-		sys.exit(0)
+		allexit()
 
 
 	def failsafe(self):
@@ -499,8 +555,13 @@ class cryptolocked:
 			print "tripfile Instantiated"
 			self.create_file(filename, content, hhash)
 			
+
+def allexit():
+	sys.exit(0)
+			
 #Main portion of the program
 if __name__ == "__main__":
+	print 1
 	parser = argparse.ArgumentParser()
 	parser.add_argument("-d","--debug", action="store_true", help="Enables debugging")
 	parser.add_argument("-t","--tentacles", action="store_true", help="Enable tantacles feature")
@@ -551,5 +612,6 @@ if __name__ == "__main__":
 	#			print cl.countermeasures()
 	#
 
+	
 	while True:
 		pass

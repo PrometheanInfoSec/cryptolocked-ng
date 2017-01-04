@@ -1,0 +1,5 @@
+#This is the hunterphile.
+#Here you define file for hunter to track
+#If any of these files are accessed hunter will alert you
+#If hunter is armed it will kill the process that accessed these files
+/etc/no_touch

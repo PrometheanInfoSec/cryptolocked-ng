@@ -417,7 +417,7 @@ class cryptolocked:
 			print "Exiting.."
 			sys.exit(-1)
 
-		self.read_conf()
+		
 		self.conf_types()
 
 
@@ -561,7 +561,6 @@ def allexit():
 			
 #Main portion of the program
 if __name__ == "__main__":
-	print 1
 	parser = argparse.ArgumentParser()
 	parser.add_argument("-d","--debug", action="store_true", help="Enables debugging")
 	parser.add_argument("-t","--tentacles", action="store_true", help="Enable tantacles feature")

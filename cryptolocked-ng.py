@@ -99,7 +99,7 @@ class hunter:
 			pidline = None
 			
 			time.sleep(self.cl.conf['hunter_pause'])
-			output = subprocess.check_output("assets\handle.exe", shell=True)
+			output = subprocess.check_output("assets\\handle.exe", shell=True)
 			for line in output.split("\n"):
 				if "pid:" in line:
 					pidline = line
@@ -107,12 +107,14 @@ class hunter:
 					
 				if len(line) == 0:
 					continue
+				if len(line.split("          ")) != 2:
+					continue
 				
+				handle = line.split("          ")[1].strip()
 				
 				for fii in self.hunterfiles:
 					
-					if fii in line:
-						print fii
+					if fii in handle:
 						pid = pidline.split()[2]
 						if self.cl.conf['armed_state'] or self.cl.conf['only_arm_hunter']:
 							subprocess.call("taskkill /pid %s" % str(pid), shell=True)

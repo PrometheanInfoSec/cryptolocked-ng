@@ -2,4 +2,10 @@
 #Here you define files handles for hunter to track
 #If any of these files are accessed hunter will alert you
 #If hunter is armed it will kill the process that accessed these files
-testfolder
+#
+#IMPORTANT
+#File handle must be an absolute path
+#linux example:
+#/root/testfolder
+#windows example:
+C:\testfolder

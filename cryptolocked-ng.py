@@ -28,6 +28,7 @@ confphile = "cl.conf"
 
 class hunter:
 	hunterfiles = []
+	lockeddict = {}
 
 	cl = None
 
@@ -84,8 +85,13 @@ class hunter:
 		for line in data.split("\n"):
 			if len(line) < 1 or line[0] == "#":
 				continue
-			self.hunterfiles.append(line)
-			print "Hunter tracking file: %s" % line
+			if ":::" not in line:
+				self.hunterfiles.append(line)
+				print "Hunter tracking file: %s" % line
+			else:
+				self.lockeddict[line.split(":::")[0]] = line.split(":::")[1]
+				self.hunterfiles.append(line.split(":::")[0])
+				print "Hunter protecting file: %s" %line.split(":::")[0], "\n\twith KeyFile of: %s\n" %line.split(":::")[1]
 	
 	def loop(self):
 		if self.osname == "nt":
@@ -96,48 +102,75 @@ class hunter:
 	def win_loop(self):
 		while True:
 		
-			pidline = None
-			
-			time.sleep(self.cl.conf['hunter_pause'])
-			output = subprocess.check_output("assets\\handle.exe", shell=True)
-			for line in output.split("\n"):
-				if "pid:" in line:
-					pidline = line
-					continue
-					
-				if len(line) == 0:
-					continue
-				if len(line.split("          ")) != 2:
-					continue
-				
-				handle = line.split("          ")[1].strip()
-				
-				for fii in self.hunterfiles:
-					
+			filepidlist = self.parse_winfiles()
+			#print filepidlist
+			count = 0
+			for handle in filepidlist:
+				for fii in self.hunterfiles:	
 					if fii in handle:
-						pid = pidline.split()[2]
-						if self.cl.conf['armed_state'] or self.cl.conf['only_arm_hunter']:
-							subprocess.call("taskkill /pid %s" % str(pid), shell=True)
-							print "Process PID [%s] has been killed for attempting to access the hunter tracked file [%s]" % (pid, fii)
+						protectedfilekey = self.lockeddict.get(fii)
+						if protectedfilekey == "None":
+							pass
 						else:
-							print "Process PID [%s] accessed file [%s] but cryptolocked.hunter is not armed so no actions were taken" % (pid, fii)
+							if protectedfilekey in filepidlist:
+								print "Process PID [%s] has opened a locked file [%s] but was not terminated as Key file [%s] was open" %(filepidlist[handle], fii, protectedfilekey)
+								continue
+						if self.cl.conf['armed_state'] or self.cl.conf['only_arm_hunter']:
+							subprocess.call("taskkill /pid %s" %str(filepidlist[handle]), shell=True)
+							print "Process PID [%s] has been killed for attempting to access the hunter tracked file [%s]" %(filepidlist[handle], fii)
+						else:
+							print "Process PID [%s] accessed file [%s] but cryptolocked.hunter is not armed so no actions were taken" %(filepidlist[handle], fii)
+				count += 1
+	
+	def parse_winfiles(self):
+		pid = None
+		filepidlist = {}
+		time.sleep(self.cl.conf['hunter_pause'])
+		output = subprocess.check_output("assets\\handle.exe", shell=True)
+		for line in output.split("\n"):
+			if "pid:" in line:
+				pid = line.split()[2]
+				#print pid
+			if len(line) == 0:
+				continue
+			if len(line.split("File")) != 2:
+				continue	
+			filepidlist[line.split("File")[1].strip()] = pid 
+		return filepidlist
 	
 	def lin_loop(self):
 		while True:
-			time.sleep(self.cl.conf['hunter_pause'])
-			output = subprocess.check_output("lsof 2>/dev/null", shell=True)
-			for line in output.split("\n"):
-				if len(line) == 0:
-					continue
+			lsoflist = self.parse_lsof()
+			count = 0
+			for filename in lsoflist[0]:
 				for fii in self.hunterfiles:
-					if fii == line.split()[-1]:
-						if self.cl.conf['armed_state'] or self.cl.conf['only_arm_hunter']:
-							subprocess.call("kill -9 %s" % line.split()[1], shell=True)
-							print "Process PID [%s] has been killed for attempting to access the hunter tracked file [%s]" % (line.split()[1], fii)
+					if fii == filename:
+						protectedfilekey = self.lockeddict.get(fii)
+						if protectedfilekey == "None":
+							pass
 						else:
-							print "Process PID [%s] accessed file [%s] but cryptolocked.hunter is not armed so no actions were taken" % (line.split()[1], fii)
+							if protectedfilekey in lsoflist[0]:
+								print "Process PID [%s] has opened a locked file [%s] but was not terminated as Key file [%s] was open" %(filepidlist[handle], fii, protectedfilekey)
+								continue	
+						if self.cl.conf['armed_state'] or self.cl.conf['only_arm_hunter']:
+							subprocess.call("kill -9 %s" %lsoflist[1][count], shell=True)
+							print "Process PID [%s] has been killed for attempting to access the hunter tracked file [%s]" % (lsoflist[1][count], fii)
+						else:
+							print "Process PID [%s] accessed file [%s] but cryptolocked.hunter is not armed so no actions were taken" % (lsoflist[1][count], fii)
+				count += 1
 
-
+	def parse_lsof(self):
+		lsoflist = [[],[]]
+		time.sleep(self.cl.conf['hunter_pause'])
+		output = subprocess.check_output("lsof 2>/dev/null", shell=True)
+		for line in output.split("\n"):
+			if len(line) == 0:
+				continue
+			else:
+				lsoflist[0].append(line.split()[-1])
+				lsoflist[1].append(line.split()[1])
+		return lsoflist
+                
 class tentacles:
 	filename = []
 	content = []

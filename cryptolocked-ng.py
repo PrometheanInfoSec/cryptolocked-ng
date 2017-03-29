@@ -345,7 +345,10 @@ class cryptolocked:
 			self.conf[key] = cnv_map[self.conf[key][1]](self.conf[key][0])
 
 
-	def __init__(self, overrides=None):
+	def __init__(self, overrides=None, debug=None):
+		if debug is not None:
+			self.functionality_test()
+
 		if not self.file_exists(confphile):
 			print "Something went wrong trying to find the conf file"
 			print "Edit the confphile variable in this script to point to the correct file."
@@ -511,6 +514,18 @@ class cryptolocked:
 		return hhash == _hash
 	
 	def functionality_test(self):
+		print "Checking if file exists:\t",not self.file_exists(".debugfile")
+		fi = open(".debugfile","w")
+		fi.close()
+		print "Checking if file created:\t", self.file_exists(".debugfile")
+		subprocess.Popen('echo 1 > .debugfile', shell=True)
+
+		(a, b) = subprocess.Popen("cat .debugfile", shell=True, stdout=subprocess.PIPE).communicate()
+		print "Checking if file written:\t", a.strip() == "1"
+		self.destroy_file(".debugfile")
+		print "Checking if file destroyed:\t", not self.file_exists(".debugfile")
+		print "If all \"True\" functionality is good"
+		exit(0)
 		return True
 		
 	#The script's countermeasures
@@ -629,7 +644,7 @@ if __name__ == "__main__":
 		overrides['only_arm_hunter'] = 'True'
 		overrides['armed_state'] = 'False'
 
-	cl = cryptolocked(overrides)
+	cl = cryptolocked(overrides, debug=args.debug)
 
 	signal.signal(signal.SIGINT, cl.safe_close)
 
